@@ -2,10 +2,11 @@
 # To change this template file, choose Tools | Templates
 # and open the template in the editor.
 
+import base64
 import json
 import requests
 import sys
-from datetime import date
+import date
 
 ###############################################################################
 # Private functions.
@@ -37,17 +38,22 @@ def calculate_performance_factors(last_week_sample, last_week_total, sorted_tota
     return [factor_short_term, factor_long_term]
 
 ###############################################################################
-# Public functions.
+# Everything else.
 ###############################################################################
 
 project_name = "teamup"
 git_user_handle = "kodecharlie"
 
+# Goto Account Settings. Under "Developer settings", visit "Personal access tokens".
+# Here, you can create a custom oauth token for accessing your private repos.
+custom_oauth_token = "915c7b1874689660dd3e24284176f95046938ba2"
+authorization = base64.b64encode(git_user_handle + ":" + custom_oauth_token)
+
 # GET /repos/:owner/:repo/stats/contributors.
 contributor_counts_endpt = 'https://api.github.com/repos/' + git_user_handle + '/' + project_name + '/stats/contributors'
 headers = {
     'Accept': 'application/vnd.github.v3+json',
-    'Authorization': 'Basic a29kZWNoYXJsaWU6OTE1YzdiMTg3NDY4OTY2MGRkM2UyNDI4NDE3NmY5NTA0NjkzOGJhMg=='
+    'Authorization': 'Basic ' + authorization
 }
 contributor_counts = requests.get(contributor_counts_endpt, headers=headers)
 
