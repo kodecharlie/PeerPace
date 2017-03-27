@@ -6,7 +6,7 @@ import base64
 import json
 import requests
 import sys
-import date
+from datetime import date
 
 ###############################################################################
 # Private functions.
