@@ -7,7 +7,7 @@ setup (
        packages = find_packages(),
 
        # Declare your packages' dependencies here, for eg:
-       install_requires = ['pprint', 'requests'],
+       install_requires = ['pprint', 'requests', 'date'],
 
        # Fill in these to make your Egg ready for upload to
        # PyPI
