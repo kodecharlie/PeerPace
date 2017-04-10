@@ -1,0 +1,63 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+   xml:lang="en-US"
+       lang="en-US">
+	<head>
+		<title>Identify Project</title>
+		{% load staticfiles %}
+		<script type="text/javascript" src="{% static 'static_jquery/js/jquery.min.js' %}"></script>
+
+		{% load jqueryui %}
+		{% jqueryui_js 1.11.4 %}
+		{% jqueryui_css 1.11.4 cupertino %}
+	</head>
+	<body>
+		<form style="text-align: center;" id="identify-project">
+			{% csrf_token %}
+			<table style="margin: 0 auto;">
+				{{ identify_project_form.as_table }}
+			</table>
+			<input type="submit" name="submit" value="Calculate Performance" />
+		</form>
+		<div style="text-align:center; font-weight:bold; font-size:500%;" id="programmer-performance-estimate"></div>
+		<script type="text/javascript">
+			$(document).ready(function() {
+				$("#identify-project").submit(function(event) {
+					// Disable default action.
+					event.preventDefault();
+
+					// Collect variables. Perform calculation.
+					var github_username = $("#identify-project input#id_github_username").val();
+					var github_project_name = $("#identify-project input#id_github_project_name").val();
+					var personal_access_token = $("#identify-project input#id_personal_access_token").val();
+					var impact_of_code_commits = $("#identify-project input#id_impact_of_code_commits").val();
+					var impact_of_line_changes = $("#identify-project input#id_impact_of_line_changes").val();
+					var impact_of_past_behavior = $("#identify-project input#id_impact_of_past_behavior").val();
+
+					$.ajax({
+						method: "GET",
+						url: "/measurepace/calculate-programmer-performance",
+						data: {
+							github_username: github_username,
+							github_project_name: github_project_name,
+							personal_access_token: personal_access_token,
+							impact_of_code_commits: impact_of_code_commits,
+							impact_of_line_changes: impact_of_line_changes,
+							impact_of_past_behavior: impact_of_past_behavior,
+						},
+						dataType: 'json',
+						success: function(data, status, jqXHR) {
+							if (jqXHR.responseJSON['status'] >= 0) {
+								$("#programmer-performance-estimate").text(jqXHR.responseJSON['performance']);
+								console.log(jqXHR.responseJSON)
+							}
+						},
+						error: function(jqXHR, status, error) {
+							console.log(error);
+						},
+					});
+				});
+			});
+		</script>
+	</body>
+</html>

@@ -1,0 +1,152 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+   xml:lang="en-US"
+       lang="en-US">
+	<head>
+		<title>Parameterize Performance Calculation</title>
+		{% load staticfiles %}
+		<script type="text/javascript" src="{% static 'static_jquery/js/jquery.min.js' %}"></script>
+
+		{% load jqueryui %}
+		{% jqueryui_js 1.11.4 %}
+		{% jqueryui_css 1.11.4 cupertino %}
+	</head>
+	<body>
+		<h2>What relative weight do source code commits, line-changes and past activity have on programmer productivity?</h2>
+		<h4>Choose a percentage in [0, 100] that says how much code commits matter.</h4>
+		<div style="margin:auto; width:50%;" id="choose-impact-of-code-commits"></div>
+		<p style="margin: 25px auto; text-align: center;" id="impact-of-code-commits">50%</p>
+
+		<hr style="margin: 25px 0px;" />
+		<h4>Choose a percentage in [0, 100] that says how much line-changes matter.</h4>
+		<div style="margin:auto; width:50%;" id="choose-impact-of-line-changes"></div>
+		<p style="margin: 25px auto; text-align: center;" id="impact-of-line-changes">50%</p>
+
+		<hr style="margin: 25px 0px;" />
+		<h4>Choose a number from 0 to 10 that says how important past behavior is versus recent activity.<br />Zero
+			means past behavior is not important at all, and 10 means it is very important and recent<br />activity
+			is not important at all.</h4>
+		<div style="margin:auto; width:50%;" id="choose-impact-of-past-behavior"></div>
+		<p style="margin: 25px auto; text-align: center;" id="impact-of-past-behavior">5</p>
+
+		<hr style="margin: 25px 0px;" />
+		<form style="text-align: center;" id="parameterize-performance-calculation" action="/measurepace/identify-project">
+			{% csrf_token %}
+			{{ performance_parameters_form }}
+			<input type="submit" name="submit" value="Next" />
+		</form>
+		<script type="text/javascript">
+			$(document).ready(function() {
+				var inside_code_commits_slider = false;
+				var inside_line_changes_slider = false;
+
+				var adjust_on_code_commit_changes = null;
+				$( "#choose-impact-of-code-commits" ).slider({
+					range: false,
+					min: 0,
+					max: 100,
+					step: 1,
+					values: [50],
+					change: function(event, ui) {
+						inside_code_commits_slider = true;
+						var impact_of_code_commits = ui.values[0];
+						if (adjust_on_code_commit_changes != null) {
+							adjust_on_code_commit_changes(impact_of_code_commits);
+						}
+						inside_code_commits_slider = false;
+					},
+					slide: function(event, ui) {
+						inside_code_commits_slider = true;
+						var impact_of_code_commits = ui.values[0];
+						if (adjust_on_code_commit_changes != null) {
+							adjust_on_code_commit_changes(impact_of_code_commits);
+						}
+						inside_code_commits_slider = false;
+					},
+					create: function(event, ui) {
+						adjust_on_code_commit_changes = function(impact_of_code_commits) {
+							if (inside_code_commits_slider == true && inside_line_changes_slider == false) {
+								var impact_of_line_changes = 100 - impact_of_code_commits;
+								$("#impact-of-code-commits").text(impact_of_code_commits + "%");
+								$("#impact-of-line-changes").text(impact_of_line_changes + "%");
+								$("#choose-impact-of-line-changes").slider("option", "values", [impact_of_line_changes]);
+							}
+						};
+					},
+				});
+
+				var adjust_on_line_changes = null;
+				$( "#choose-impact-of-line-changes" ).slider({
+					range: false,
+					min: 0,
+					max: 100,
+					step: 1,
+					values: [50],
+					change: function(event, ui) {
+						inside_line_changes_slider = true;
+						var impact_of_line_changes = ui.values[0];
+						if (adjust_on_line_changes != null) {
+							adjust_on_line_changes(impact_of_line_changes);
+						}
+						inside_line_changes_slider = false;
+					},
+					slide: function(event, ui) {
+						inside_line_changes_slider = true;
+						var impact_of_line_changes = ui.values[0];
+						if (adjust_on_line_changes != null) {
+							adjust_on_line_changes(impact_of_line_changes);
+						}
+						inside_line_changes_slider = false;
+					},
+					create: function(event, ui) {
+						adjust_on_line_changes = function(impact_of_line_changes) {
+							if (inside_code_commits_slider == false && inside_line_changes_slider == true) {
+								var impact_of_code_commits = 100 - impact_of_line_changes;
+								$("#impact-of-line-changes").text(impact_of_line_changes + "%");
+								$("#impact-of-code-commits").text(impact_of_code_commits + "%");
+								$("#choose-impact-of-code-commits").slider("option", "values", [impact_of_code_commits]);
+							}
+						};
+					},
+				});
+
+				var adjust_on_past_behavior = null;
+				$( "#choose-impact-of-past-behavior" ).slider({
+					range: false,
+					min: 0,
+					max: 10,
+					step: 1,
+					values: [5],
+					change: function(event, ui) {
+						var impact_of_past_behavior = ui.values[0];
+						if (adjust_on_past_behavior != null) {
+							adjust_on_past_behavior(impact_of_past_behavior);
+						}
+					},
+					slide: function(event, ui) {
+						var impact_of_past_behavior = ui.values[0];
+						if (adjust_on_past_behavior != null) {
+							adjust_on_past_behavior(impact_of_past_behavior);
+						}
+					},
+					create: function(event,  ui) {
+						adjust_on_past_behavior = function(impact_of_past_behavior)	{
+							$("#impact-of-past-behavior").text(impact_of_past_behavior);
+						};
+					},
+				});
+
+				$( "#parameterize-performance-calculation" ).submit(function(event) {
+					// Grab parameters and set them to hidden inputs in the form.
+					var impact_of_code_commits = $("#choose-impact-of-code-commits").slider("option", "values")[0] / 100.0;
+					var impact_of_line_changes = $("#choose-impact-of-line-changes").slider("option", "values")[0] / 100.0;
+					var impact_of_past_behavior = $("#choose-impact-of-past-behavior").slider("option", "values")[0] / 10.0;
+					$("#parameterize-performance-calculation input#id_impact_of_code_commits").val(impact_of_code_commits);
+					$("#parameterize-performance-calculation input#id_impact_of_line_changes").val(impact_of_line_changes);
+					$("#parameterize-performance-calculation input#id_impact_of_past_behavior").val(impact_of_past_behavior);
+					return true;
+				});
+		  	});
+		</script>
+	</body>
+</html>

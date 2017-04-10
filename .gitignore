@@ -1,3 +1,8 @@
+.DS_Store
+
 build
 dist
 PeerPace.egg-info
+*.pyc
+
+files
