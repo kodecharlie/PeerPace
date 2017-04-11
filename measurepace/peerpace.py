@@ -9,7 +9,12 @@ class PeerPace:
     # "Private" functions.
     ###############################################################################
 
-    def calculate_performance_factors(last_week_sample, last_week_total, sorted_totals_array):
+    def calculate_performance_factors(
+        self,
+        last_week_sample,
+        last_week_total,
+        sorted_totals_array
+    ):
         num_weeks = len(sorted_totals_array)
 
         # Short-term factor for commits.
