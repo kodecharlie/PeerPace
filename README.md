@@ -13,3 +13,11 @@ I have published <code>PeerPace</code> under the MIT license, which means you ca
 ## Contributions
 
 <code>PeerPace</code> is a Python-based application authored on top of the django framework.  It uses the typical array of web UI tools like CSS and javascript/jQuery.  If you are so inclined to help out, let me know by pointing out some of your existing software repos so I can gauge your level of aptitude for this project.
+
+## Requirements
+
+You need django 1.10 and python 2.7, or better.
+
+## Installation
+
+More on this eventually.
