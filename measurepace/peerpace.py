@@ -17,10 +17,10 @@ class PeerPace:
     ):
         num_weeks = len(sorted_totals_array)
 
-        # Short-term factor for commits.
-        factor_short_term = last_week_sample / last_week_total
+        # Short-term factor.
+        factor_short_term = (last_week_sample / last_week_total) if (last_week_total > 0) else 0
 
-        # Long-term factor for line deltas.
+        # Long-term factor.
         if last_week_sample < sorted_totals_array[0]:
             # This could happen if the last week's sample is 0, and the sorted_totals_array
             # only incudes non-zero elements. This is equivalent to "worst" performance.
@@ -36,7 +36,7 @@ class PeerPace:
             # distribution function:  P(X <= x)
             sample_idx = sorted_totals_array.index(last_week_sample)
             factor_long_term = (sample_idx + 1.0) / num_weeks
-        
+
         return [factor_short_term, factor_long_term]
 
     ###############################################################################
@@ -128,21 +128,20 @@ class PeerPace:
         commits_long_term = 0
         week_of = date.today().strftime("%A, %B %d, %Y")
 
-        # Calculate short- and long-term factors for line-deltas.
-        if last_week['timestamp'] != None and last_week['num_line_changes'] > 0 and last_week['num_commits'] > 0:
-            [lines_short_term, lines_long_term] = calculate_performance_factors(
-                self,
-                last_week['num_line_changes'],
-                stats['weekly_counts'][timestamp]['num_line_changes'],
-                sorted_num_line_changes
-            )
-            [commits_short_term, commits_long_term] = calculate_performance_factors(
-                self,
-                last_week['num_commits'],
-                stats['weekly_counts'][timestamp]['num_commits'],
-                sorted_num_commits
-            )
-            week_of = date.fromtimestamp(last_week['timestamp']).strftime("%A, %B %d, %Y")
+        # Calculate short- and long-term factors for line-deltas and code-commits.
+        [lines_short_term, lines_long_term] = self.calculate_performance_factors(
+            last_week['num_line_changes'],
+            stats['weekly_counts'][timestamp]['num_line_changes'],
+            sorted_num_line_changes
+        )
+        [commits_short_term, commits_long_term] = self.calculate_performance_factors(
+            last_week['num_commits'],
+            stats['weekly_counts'][timestamp]['num_commits'],
+            sorted_num_commits
+        )
+
+        if last_week['timestamp'] != None:
+             week_of = date.fromtimestamp(last_week['timestamp']).strftime("%A, %B %d, %Y")
 
         commits_factor = (1.0-impact_of_past_behavior)*commits_short_term + impact_of_past_behavior*commits_long_term
         lines_factor = (1.0-impact_of_past_behavior)*lines_short_term + impact_of_past_behavior*lines_long_term
