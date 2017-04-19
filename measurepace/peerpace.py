@@ -3,6 +3,7 @@ import json
 import requests
 import sys
 from datetime import date
+from statistics import mean, variance
 
 class PeerPace:
     ###############################################################################
@@ -13,29 +14,32 @@ class PeerPace:
         self,
         last_week_sample,
         last_week_total,
-        sorted_totals_array
+        developer_stats,
+        github_username
     ):
-        num_weeks = len(sorted_totals_array)
-
         # Short-term factor.
-        factor_short_term = (last_week_sample / last_week_total) if (last_week_total > 0) else 0
+        factor_short_term = (float(last_week_sample) / last_week_total) if (last_week_total > 0) else 0
 
         # Long-term factor.
-        if last_week_sample < sorted_totals_array[0]:
-            # This could happen if the last week's sample is 0, and the sorted_totals_array
-            # only incudes non-zero elements. This is equivalent to "worst" performance.
-            factor_long_term = 0.0
-        elif last_week_sample > sorted_totals_array[num_weeks-1]:
-            # This should never happen, but if it does, assume "top" performance.
-            factor_long_term = 1.0
+        git_developer_ltm = -1
+        steadiness = {}
+        for developer in developer_stats:
+            if developer_stats[developer]['var'] <= 0:
+                cur_steadiness = float(inf)
+            else:
+                cur_steadiness = float(developer_stats[developer]['mu']) / developer_stats[developer]['var']
+
+            steadiness[developer] = cur_steadiness
+            if github_username == developer:
+                git_developer_ltm = steadiness[developer]
+
+        ltm_values = steadiness.values()
+        if git_developer_ltm <= 0 or len(ltm_values) <= 0:
+            factor_long_term = 0
         else:
-            # If there are repeating elements in the array sorted_num_line_changes
-            # starting at index sample_idx, then we underweight the contribution
-            # here by referencing the earliest sample of the sequence of repeating 
-            # elements. In effect, what we are calculating here is the cumulative
-            # distribution function:  P(X <= x)
-            sample_idx = sorted_totals_array.index(last_week_sample)
-            factor_long_term = (sample_idx + 1.0) / num_weeks
+            ltm_values.sort()
+            git_developer_ltm_index = ltm_values.index(git_developer_ltm)
+            factor_long_term = (1.0 + git_developer_ltm_index) / len(ltm_values)
 
         return [factor_short_term, factor_long_term]
 
@@ -77,7 +81,8 @@ class PeerPace:
             'total_commits': 0,
             'total_line_changes': 0,
             'num_developers': 0,
-            'weekly_counts': {}
+            'weekly_totals': {},
+            'developer_stats': {},
         }
         last_week = {'num_commits': 0, 'num_line_changes': 0, 'timestamp': None}
 
@@ -87,17 +92,29 @@ class PeerPace:
             stats['total_commits'] += developer['total']
             stats['num_developers'] += 1
 
+            if not stats['developer_stats'].keys():
+                stats['developer_stats']['code_commits'] = {}
+                stats['developer_stats']['line_changes'] = {}
+
+            code_commits = []
+            line_changes = []
+
             # Tally weekly stats. Weeks are ordered chronologically.
             for week in developer['weeks']:
                 num_commits = week['c']
                 num_line_changes = week['a'] + week['d']
                 stats['total_line_changes'] += num_line_changes
                 timestamp = week['w']
-                if timestamp not in stats['weekly_counts']:
-                    stats['weekly_counts'][timestamp] = {'num_commits': 0, 'num_line_changes': 0}
 
-                stats['weekly_counts'][timestamp]['num_commits'] += num_commits
-                stats['weekly_counts'][timestamp]['num_line_changes'] += num_line_changes
+                if timestamp not in stats['weekly_totals']:
+                    stats['weekly_totals'][timestamp] = {'num_commits': 0, 'num_line_changes': 0}
+
+                stats['weekly_totals'][timestamp]['num_commits'] += num_commits
+                stats['weekly_totals'][timestamp]['num_line_changes'] += num_line_changes
+                
+                if num_commits > 0 or num_line_changes > 0:
+                    code_commits.append(num_commits)
+                    line_changes.append(num_line_changes)
 
                 # Final week's samples will be written last.
                 if developer_author_login == github_username:
@@ -105,43 +122,44 @@ class PeerPace:
                     last_week['num_line_changes'] = num_line_changes
                     last_week['timestamp'] = timestamp
 
-        # Calculate sorted arrays for both num_commits and num_line_changes.
-        sorted_num_commits = []
-        sorted_num_line_changes = []
-        for timestamp in sorted(stats['weekly_counts']):
-            # Ignore weeks during which there are neither commits nor line-changes.
-            num_commits = stats['weekly_counts'][timestamp]['num_commits']
-            num_line_changes = stats['weekly_counts'][timestamp]['num_line_changes']
-            if num_commits <= 0 and num_line_changes <= 0:
-                continue
-
-            sorted_num_commits.append(stats['weekly_counts'][timestamp]['num_commits'])
-            sorted_num_line_changes.append(stats['weekly_counts'][timestamp]['num_line_changes'])
-
-        sorted_num_commits.sort()
-        sorted_num_line_changes.sort()
-
-        # Default factors set to 0, meaning that when no work is done, implied performance is 0.
-        lines_short_term = 0
-        lines_long_term = 0
-        commits_short_term = 0
-        commits_long_term = 0
-        week_of = date.today().strftime("%A, %B %d, %Y")
-
-        # Calculate short- and long-term factors for line-deltas and code-commits.
-        [lines_short_term, lines_long_term] = self.calculate_performance_factors(
-            last_week['num_line_changes'],
-            stats['weekly_counts'][timestamp]['num_line_changes'],
-            sorted_num_line_changes
-        )
-        [commits_short_term, commits_long_term] = self.calculate_performance_factors(
-            last_week['num_commits'],
-            stats['weekly_counts'][timestamp]['num_commits'],
-            sorted_num_commits
-        )
+            # Calculate mean and variance.
+            stats['developer_stats']['code_commits'] = {
+                developer_author_login: {
+                    'mu': mean(code_commits) if len(code_commits) > 0 else 0,
+                    'var': variance(code_commits) if len(code_commits) > 1 else 0
+                }
+            }
+            stats['developer_stats']['line_changes'] = {
+                developer_author_login: {
+                    'mu': mean(line_changes) if len(line_changes) > 0 else 0,
+                    'var': variance(line_changes) if len(line_changes) > 1 else 0
+                }
+            }
 
         if last_week['timestamp'] != None:
-             week_of = date.fromtimestamp(last_week['timestamp']).strftime("%A, %B %d, %Y")
+            timestamp = last_week['timestamp']
+            week_of = date.fromtimestamp(timestamp).strftime("%A, %B %d, %Y")
+
+            # Calculate short- and long-term factors for line-deltas and code-commits.
+            [lines_short_term, lines_long_term] = self.calculate_performance_factors(
+                last_week['num_line_changes'],
+                stats['weekly_totals'][timestamp]['num_line_changes'],
+                stats['developer_stats']['line_changes'],
+                github_username
+            )
+            [commits_short_term, commits_long_term] = self.calculate_performance_factors(
+                last_week['num_commits'],
+                stats['weekly_totals'][timestamp]['num_commits'],
+                stats['developer_stats']['code_commits'],
+                github_username
+            )
+        else:
+            week_of = date.today().strftime("%A, %B %d, %Y")
+            # Default factors set to 0, meaning that when there is no project history, implied performance is 0.
+            lines_short_term = 0
+            lines_long_term = 0
+            commits_short_term = 0
+            commits_long_term = 0
 
         commits_factor = (1.0-impact_of_past_behavior)*commits_short_term + impact_of_past_behavior*commits_long_term
         lines_factor = (1.0-impact_of_past_behavior)*lines_short_term + impact_of_past_behavior*lines_long_term
